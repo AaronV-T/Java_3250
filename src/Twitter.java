@@ -72,7 +72,7 @@ public class Twitter {
                             twitterStream.shutdown();
                         }
                         else {
-                            print_tweet(counter++, status, storeTweets);
+
                             String tweet = status.getText();
                             
                             //If this is a re-tweet, get the original tweet (To avoid possible loss of characters on the end)
@@ -81,8 +81,7 @@ public class Twitter {
 
                             tweet = CleanTweet(tweet);
                             storeTweets.add(tweet);
-
-                            print_tweet(counter++, status,storeTweets);
+                            print_tweet(counter++, status); //Verbose for user
                         }
                     }
 
@@ -120,8 +119,6 @@ public class Twitter {
                 stream_Filter.language("en");                           //English only
                 twitterStream.filter(stream_Filter);                    //apply filter to stream
 
-
-
             } catch (Exception e) {
                 System.out.println(e);
             }
@@ -158,26 +155,25 @@ public class Twitter {
         }
 
         /* Used to print a user and their tweet */
-        private static void print_tweet(int index, Status s, LinkedHashSet theSet) {
+        private static void print_tweet(int index, Status s) {
             System.out.println("\n[" + index + "]");
             System.out.println("User: " + s.getUser().getScreenName() + ", Tweet: " + s.getText());
         }
 
-        private static void toJson(LinkedHashSet<String> theSet){
-            try{
+        private static void toJson(LinkedHashSet<String> theSet) {
+            try {
                 StringBuffer jsonBuffer = new StringBuffer();
                 jsonBuffer.append("{\"type\":\"pre-sentenced\",\"text\":[");
 
-                for(String twt:theSet){ //For every string in the set of tweet strings, append it to our jsonBuffer.
-                    jsonBuffer.append("{\"sentence\":\""+twt+"\"},");
+                for (String twt : theSet) { //For every string in the set of tweet strings, append it to our jsonBuffer.
+                    jsonBuffer.append("{\"sentence\":\"" + twt + "\"},");
                 }
-                
+
                 //If the last character is a comma, remove it.
-                if (jsonBuffer.charAt(jsonBuffer.length() - 1) == ',')
-                {
+                if (jsonBuffer.charAt(jsonBuffer.length() - 1) == ',') {
                     jsonBuffer.deleteCharAt(jsonBuffer.length() - 1);
                 }
-                
+
                 jsonBuffer.append("]}");
 
                 System.out.println(jsonBuffer.toString());
@@ -190,36 +186,42 @@ public class Twitter {
                 conn.setRequestProperty("X-Mashape-Key", "6KlwDbtPVHmshIgWuSzH7z574UOzp1k4TLyjsnFORCaklTMv9k");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("Accept", "application/json");
-
                 conn.setDoOutput(true);
-                try (DataOutputStream  writer = new DataOutputStream(conn.getOutputStream()))
-                {
+
+                try (DataOutputStream writer = new DataOutputStream(conn.getOutputStream())) {
                     writer.writeBytes(jsonBuffer.toString());
                     writer.flush();
-                } catch (IOException e) {
+                }
+                catch (IOException e) {
                     e.printStackTrace(System.out);
                 }
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream())))
-                {   //This is currently receiving a 402 response from the URL.
+
+                //This is currently receiving a 402 response from the URL.
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
                     String line;
                     System.out.println("Reading response.");
-                    
+
                     while ((line = reader.readLine()) != null)
                         System.out.println(line);
-                    
+
                 } catch (IOException e) {
                     e.printStackTrace(System.out);
                     System.out.println(conn.getHeaderField("Connection"));
                     System.out.println(conn.getHeaderField("Content-Length"));
                 }
+            } catch (Exception e) {
+                System.out.println("Error: " + e);
+            }
+        }
 
-        private static void print_tweet(int index, Status s,TreeSet theSet) {
+        /*
+        private static void print_tweet(int index, Status s, LinkedHashSet theSet) {
             String tweet = s.getText().toLowerCase();
             if (index > 0)
             {
-                theSet.add(s.getUser().getName() + "@" + s.getUser().getScreenName() + "Tweet" + tweet);
+                theSet.add(s.getUser().getName() + "@" + s.getUser().getScreenName() + " Tweet" + tweet);
             }
-        }
+        } */
 
         /* Needed to check if stream is below threshold */
         static int total_tweets = 0;
