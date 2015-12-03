@@ -3,53 +3,104 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.util.*;
 import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Twitter {
-
-    /* Main */
     public static void main(String[] args) {
-        Streaming streamer = new Streaming();
-        LinkedHashSet<String> storeTweets = new LinkedHashSet<>();
+        // local vars
+        Scanner reader = new Scanner(System.in);
+        String given = "";
+        int number_of_tweets = 0, number_of_search_terms = 0, search_term = 1;
 
-        try 
-        {
-            //Try to open stream using the streamer class
-            streamer.streaming(storeTweets);
-        }
-        catch (Exception e) {
-            System.out.println(e);
+            /* Ask for number of search terms */
+        do {
+                System.out.println("# of terms to search?");
+                System.out.print("> ");
+                if (reader.hasNextInt()) {
+                    number_of_search_terms = reader.nextInt();
+                    System.out.println();
+                } else {
+                    System.out.println("Error -- Usage: [integer] greater than 0\n");
+                }
+
+                reader.nextLine();
+        } while (number_of_search_terms == 0);
+
+            /* create thread pool */
+        ExecutorService pool = Executors.newFixedThreadPool(number_of_search_terms);
+        try {
+            /* master loop, collecting tweets for each search term */
+            do {
+            /* Ask for search term */
+                do {
+                    System.out.println("search term " + search_term++ + "?");
+                    System.out.print("> ");
+                    given = reader.nextLine().toLowerCase().trim();
+                    System.out.println();
+                    if (!given.equals("")) break;
+                    else System.out.println("Error -- Usage: [String] anything really... come on.\n");
+                } while (given.equals(""));
+
+                /* Get number of Tweets */
+                do {
+                    System.out.println("# of tweets to catch? ( min 500 )");
+                    System.out.print("> ");
+                    if (reader.hasNextInt()) {
+                        number_of_tweets = reader.nextInt();
+                        System.out.println();
+                    } else {
+                        System.out.println("Error -- Usage: [integer] greater than 499\n");
+                    }
+
+                    reader.nextLine();
+                } while (number_of_tweets <= 499);
+
+                /* create new thread to collect tweets */
+                pool.execute(new Streaming(given, number_of_tweets));
+
+                /* remove number_of_search_terms by one */
+                number_of_search_terms--;
+
+                Thread.sleep(4000);
+
+            } while (number_of_search_terms != 0);
+
+                /* Gracefully shutdown executor */
+            pool.shutdown();
+            pool.awaitTermination(5, TimeUnit.SECONDS);
+        } catch ( InterruptedException ex) {
+            System.err.println(ex.getMessage());
+        } finally {
+            if(!pool.isTerminated()) {
+                System.err.println("canceling non-finished tasks");
+            }
+            pool.shutdown();
+            System.out.println("shutdown complete");
         }
     }
 
     /* Handles all connections to the Twitter Streaming API */
-    static class Streaming {
-        public void streaming(LinkedHashSet<String> storeTweets) {
+    static class Streaming implements Runnable {
+        // local vars
+        private LinkedHashSet<String> storeTweets = new LinkedHashSet<>();
+        private String given;
+        private int number_of_tweets;
+        static int term_count = 0;
 
-            Scanner reader = new Scanner(System.in);
-            String given         = "";                                  //For search term
-            int number_of_tweets = 0;                                   //Total number of tweets, default at 25
+        /* constructor */
+        Streaming(String given, int number_of_tweets) {
+            this.given = given;
+            this.number_of_tweets = number_of_tweets;
+            term_count++;
+        }
 
+        @Override
+        public void run() {
             try
             {
-                /* Ask for search term */
-                while(given.equals("")) {
-                    System.out.println("search term?");
-                    System.out.print("> "); given = reader.nextLine();
-
-                    System.out.println();
-                }
-
-                given = given.toLowerCase();
-                given = given.trim();
-
-                /*Get number of Tweets*/
-                while(number_of_tweets == 0) {
-                    System.out.println("# of tweets to catch?");
-                    System.out.print("> "); number_of_tweets = reader.nextInt();
-                    System.out.println();
-                }
-
-                final int final_tweets = number_of_tweets;              //Inner class needs a final variable
+               final int final_tweets = this.number_of_tweets;
 
                 /* Open stream */
                 TwitterStream twitterStream = new TwitterStreamFactory().getInstance();
@@ -78,7 +129,7 @@ public class Twitter {
 
                             tweet = CleanTweet(tweet);
                             storeTweets.add(tweet);
-                            print_tweet(counter++, status); //Verbose for user
+                            // print_tweet(counter++, status); //Verbose for user
                         }
                     }
 
@@ -217,6 +268,5 @@ public class Twitter {
         static boolean stream_watcher( int max_tweets ) {
             return ++total_tweets > max_tweets;
         }
-
     }
 }
