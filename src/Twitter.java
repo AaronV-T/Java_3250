@@ -3,9 +3,6 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.util.*;
 import java.net.URL;
-import com.mashape.unirest.http.Unirest;
-import com.mashape.unirest.http.JsonNode;
-import com.mashape.unirest.http.HttpResponse;
 
 public class Twitter {
 
@@ -183,7 +180,8 @@ public class Twitter {
 
                 //Set request headers.
                 conn.setRequestMethod("POST");
-                conn.setRequestProperty("X-Mashape-Key", "6KlwDbtPVHmshIgWuSzH7z574UOzp1k4TLyjsnFORCaklTMv9k");
+                //conn.setRequestProperty("X-Mashape-Key", "6KlwDbtPVHmshIgWuSzH7z574UOzp1k4TLyjsnFORCaklTMv9k");
+                conn.setRequestProperty("X-Mashape-Key", "3qhKsAzciTmsh2xJmNjMWclaHDuDp1vcvYBjsnpMkIIbebgLRx");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("Accept", "application/json");
                 conn.setDoOutput(true);
