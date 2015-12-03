@@ -212,15 +212,6 @@ public class Twitter {
             }
         }
 
-        /*
-        private static void print_tweet(int index, Status s, LinkedHashSet theSet) {
-            String tweet = s.getText().toLowerCase();
-            if (index > 0)
-            {
-                theSet.add(s.getUser().getName() + "@" + s.getUser().getScreenName() + " Tweet" + tweet);
-            }
-        } */
-
         /* Needed to check if stream is below threshold */
         static int total_tweets = 0;
         static boolean stream_watcher( int max_tweets ) {
