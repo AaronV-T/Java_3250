@@ -3,28 +3,28 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.util.*;
 import java.net.URL;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import org.json.XML;
+import org.json.JSONObject;
 
 public class Twitter {
     public static void main(String[] args) {
         // local vars
         Scanner reader = new Scanner(System.in);
-        int number_of_tweets = 0, number_of_search_terms = 0, search_term = 1;
+        int number_of_search_terms = 0, search_term = 1;
 
-            /* Ask for number of search terms */
-        do {
-                System.out.println("1 or 2 search terms?");
-                System.out.print("> ");
-                if (reader.hasNextInt()) {
-                    number_of_search_terms = reader.nextInt();
-                    System.out.println();
-                } else {
-                    System.out.println("Error -- Usage: [integer] greater than 0\n");
-                }
+        /* Ask for number of search terms */
+        do
+        {
+            System.out.println("1 or 2 search terms?");
+            System.out.print("> ");
+            if (reader.hasNextInt()) {
+                number_of_search_terms = reader.nextInt();
+                System.out.println();
+            } else {
+                System.out.println("Error -- Usage: [integer] greater than 0\n");
+            }
 
-                reader.nextLine();
+            reader.nextLine();
         } while (number_of_search_terms < 1 || number_of_search_terms > 2);
 
         String[] searchTerms = new String[number_of_search_terms];
@@ -43,7 +43,7 @@ public class Twitter {
 
             /* Get number of Tweets */
             do {
-                System.out.println("# of tweets to catch? ( min 10 )");
+                System.out.println("# of tweets to catch? ( min 500 )");
                 System.out.print("> ");
                 if (reader.hasNextInt()) {
                     numberOfTweets[i] = reader.nextInt();
@@ -81,7 +81,7 @@ public class Twitter {
         public void Start() {
             try
             {
-               final int final_tweets = this.number_of_tweets;
+                final int final_tweets = this.number_of_tweets;
 
                 /* Open stream */
                 TwitterStream twitterStream = new TwitterStreamFactory().getInstance();
@@ -188,12 +188,6 @@ public class Twitter {
             return cleanedTweet;
         }
 
-        /* Used to print a user and their tweet*/
-        /*private void print_tweet(int index, Status s) {
-            System.out.println("\n[" + index + "]");
-            System.out.println("User: " + s.getUser().getScreenName() + ", Tweet: " + s.getText());
-        }*/
-
         private void ClusterAndSave(LinkedHashSet<String> tweetSet, String searchTerm) {
             StringBuffer jsonBuffer = new StringBuffer();
             jsonBuffer.append("{\"type\":\"pre-sentenced\",\"text\":[");
@@ -233,7 +227,7 @@ public class Twitter {
                     System.out.println(jsonBuffer.toString());
 
                     while ((line = reader.readLine()) != null)
-                        System.out.println(line);
+                        jToXml(line);
 
                 } catch (IOException e) {
                     e.printStackTrace(System.out);
@@ -244,9 +238,23 @@ public class Twitter {
                 System.out.println("Error: " + e);
             }
         }
+        private void jToXml(String input){
+            try {
+                JSONObject myJson = new JSONObject(input);
+                String xmlCon = XML.toString(myJson);
+                System.out.println(xmlCon);
+                try (Writer writer = new BufferedWriter(new OutputStreamWriter(
+                        new FileOutputStream(given +".xml"), "utf-8"))) {
+                    writer.write(xmlCon);
+                }catch(Exception e){
+                    e.printStackTrace(System.out);
+                }
+            }catch(Exception e){
+                e.printStackTrace(System.out);
+            }
+        }
 
         /* Needed to check if stream is below threshold */
-
         boolean stream_watcher( int max_tweets ) {
             return ++total_tweets > max_tweets; //Return true if we have reached max tweets amount
         }
