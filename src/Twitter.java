@@ -8,52 +8,77 @@ import org.json.JSONObject;
 
 public class Twitter {
     public static void main(String[] args) {
-        // local vars
-        Scanner reader = new Scanner(System.in);
+        String[] searchTerms;
+        int[] numberOfTweets;
         int number_of_search_terms = 0, search_term = 1;
 
+        if(args.length == 0){
+            // local vars
+            Scanner reader = new Scanner(System.in);
         /* Ask for number of search terms */
-        do
-        {
-            System.out.println("1 or 2 search terms?");
-            System.out.print("> ");
-            if (reader.hasNextInt()) {
-                number_of_search_terms = reader.nextInt();
-                System.out.println();
-            } else {
-                System.out.println("Error -- Usage: [integer] greater than 0\n");
-            }
-
-            reader.nextLine();
-        } while (number_of_search_terms < 1 || number_of_search_terms > 2);
-
-        String[] searchTerms = new String[number_of_search_terms];
-        int[] numberOfTweets = new int[number_of_search_terms];
-        /* master loop, collecting tweets for each search term */
-        for (int i = 0; i < number_of_search_terms; i++) {
-        /* Ask for search term */
             do {
-                System.out.println("search term " + search_term++ + "?");
-                System.out.print("> ");
-                searchTerms[i] = reader.nextLine().toLowerCase().trim();
-                System.out.println();
-                if (!searchTerms[i].equals("")) break;
-                else System.out.println("Error -- Usage: [String] anything really... come on.\n");
-            } while (searchTerms[i].equals(""));
-
-            /* Get number of Tweets */
-            do {
-                System.out.println("# of tweets to catch? ( min 500 )");
+                System.out.println("1 or 2 search terms?");
                 System.out.print("> ");
                 if (reader.hasNextInt()) {
-                    numberOfTweets[i] = reader.nextInt();
+                    number_of_search_terms = reader.nextInt();
                     System.out.println();
                 } else {
-                    System.out.println("Error -- Usage: [integer] greater than 10\n");
+                    System.out.println("Error -- Usage: [integer] greater than 0\n");
                 }
 
                 reader.nextLine();
-            } while (numberOfTweets[i] < 10);
+            } while (number_of_search_terms < 1 || number_of_search_terms > 2);
+
+            searchTerms = new String[number_of_search_terms];
+            numberOfTweets = new int[number_of_search_terms];
+        /* master loop, collecting tweets for each search term */
+            for (int i = 0; i < number_of_search_terms; i++) {
+        /* Ask for search term */
+                do {
+                    System.out.println("search term " + search_term++ + "?");
+                    System.out.print("> ");
+                    searchTerms[i] = reader.nextLine().toLowerCase().trim();
+                    System.out.println();
+                    if (!searchTerms[i].equals("")) break;
+                    else System.out.println("Error -- Usage: [String] anything really... come on.\n");
+                } while (searchTerms[i].equals(""));
+
+            /* Get number of Tweets */
+                do {
+                    System.out.println("# of tweets to catch? ( min 500 )");
+                    System.out.print("> ");
+                    if (reader.hasNextInt()) {
+                        numberOfTweets[i] = reader.nextInt();
+                        System.out.println();
+                    } else {
+                        System.out.println("Error -- Usage: [integer] greater than 10\n");
+                    }
+
+                    reader.nextLine();
+                } while (numberOfTweets[i] < 10);
+            }
+        }
+        else
+        {
+            //args [String 1] [tweet count 1] [String 2] [Tweet count 2]
+            if(args.length == 2){
+                //One search
+                number_of_search_terms = 1;
+                numberOfTweets = new int[1];
+                numberOfTweets[0] = Integer.parseInt(args[1]);
+                searchTerms = new String[1];
+                searchTerms[0] = args[0];
+            }
+            else
+            {
+                number_of_search_terms = 2;
+                numberOfTweets = new int[2];
+                numberOfTweets[0] = Integer.parseInt(args[1]);
+                numberOfTweets[1] = Integer.parseInt(args[3]);
+                searchTerms = new String[2];
+                searchTerms[0] = args[0];
+                searchTerms[1] = args[2];
+            }
         }
 
         for (int i = 0; i < number_of_search_terms; i++) { //For each search term, create a new Streaming object and run it.
