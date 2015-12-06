@@ -3,6 +3,8 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.util.*;
 import java.net.URL;
+import java.util.concurrent.ExecutionException;
+
 import org.json.XML;
 import org.json.JSONObject;
 
@@ -11,7 +13,7 @@ public class Twitter {
         /* local vars */
         String[] searchTerms;
         int[] numberOfTweets;
-        int numberOfSearchTerms, searchTerm = 1, minNumOfTweets = 10; /* change minNumOfTweets HERE!!! */
+        int numberOfSearchTerms, searchTerm = 1, maxTweets = 10000, minNumOfTweets = 10; /* change minNumOfTweets HERE!!! */
 
         /* terminal -- no GUI */
         if(args.length == 0){
@@ -53,11 +55,11 @@ public class Twitter {
 
             /* get number of Tweets */
                 do {
-                    System.out.println("# of tweets to catch? ( min " + minNumOfTweets + " )");
+                    System.out.println("# of tweets to catch? (Min: " + minNumOfTweets + ". Max: " + maxTweets + ")");
                     System.out.print("> ");
                     if (reader.hasNextInt()) {
                         numberOfTweets[i] = reader.nextInt();
-                        if (numberOfTweets[i] >= minNumOfTweets) {
+                        if (numberOfTweets[i] >= minNumOfTweets && numberOfTweets[i] <= maxTweets) {
                             reader.nextLine();
                             System.out.println();
                             break;
@@ -65,7 +67,7 @@ public class Twitter {
                     } else {
                         reader.next(); /* account for string as input */
                     }
-                    System.out.println("Error -- Usage: [integer: >= " + minNumOfTweets + "]\n");
+                    System.out.println("Error -- Usage: [" + minNumOfTweets + " <= VALUE <= " + maxTweets + "]\n");
                 } while (true);
             }
         }
@@ -136,7 +138,19 @@ public class Twitter {
                             if (!finished) { /* if this hasn't already happened */
                                 finished = true;
                                 twitterStream.clearListeners(); /* remove the listeners from our twitterStream object */
+
+                                /*for (String twt:originalTweets) { //testing purposes
+                                    twt = twt.replace("\n", " ");
+                                    String unicodeString = "";
+                                    for (int i = 0; i < twt.length(); i++) {
+                                        int unicodeVal = twt.charAt(i);
+                                        unicodeString += unicodeVal + " ";
+                                    }
+
+                                    System.out.println(twt + " --- " + cleanTweet(twt) + " --- " + unicodeString);
+                                }*/
                                 saveAsXML(replaceTweetsWithOriginals(getClusterResults(storeTweets, given))); /* get cluster results, replace clean tweets with originals, convert to XML and write to file */
+
                                 twitterStream.cleanUp(); /* shutdown internal stream consuming thread */
                             }
                         }
@@ -148,7 +162,8 @@ public class Twitter {
 
                             String cleanTweet = cleanTweet(tweet);
                             if (!storeTweets.contains(cleanTweet)) { /* if this is not a duplicate tweet, add it to original tweet set and add its clean tweet to to the clean tweet set */
-                                originalTweets.add("@" + status.getUser().getScreenName() + ": " + tweet);
+                                String safeTweet = removeUnsafeUnicodeCharacters(tweet);
+                                originalTweets.add("@" + status.getUser().getScreenName() + "= " + safeTweet);
                                 storeTweets.add(cleanTweet);
                             }
                             System.out.println(given + ": " + counter);
@@ -228,7 +243,7 @@ public class Twitter {
 
         /* getClusterResults: Formats all strings in a LinkedHashSet into JSON, submits to clustering API, and returns the response from the clustering API. */
         String getClusterResults (LinkedHashSet<String> tweetSet, String searchTerm) {
-            StringBuffer jsonBuffer = new StringBuffer();
+            StringBuilder jsonBuffer = new StringBuilder();
             jsonBuffer.append("{\"type\":\"pre-sentenced\",\"text\":[");
 
             for (String twt : tweetSet) /* for every string in the set of tweet strings, append it to our jsonBuffer */
@@ -259,22 +274,22 @@ public class Twitter {
                 catch (IOException e) {
                     e.printStackTrace(System.out);
                 }
+                System.out.println("Tweets sent for analysis, waiting for response.");
 
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
                     String line;
-                    System.out.println("For search term: " + searchTerm + ". Unique Sentences: " + tweetSet.size());
-                    System.out.println(jsonBuffer.toString());
+                    System.out.println("Cluster results received for search term: " + searchTerm + ". Unique Sentences: " + tweetSet.size());
 
                     while ((line = reader.readLine()) != null) {
                         System.out.println(line);
                         clusterResults += line;
                     }
-
                 } catch (IOException e) {
                     e.printStackTrace(System.out);
                     System.out.println(conn.getHeaderField("Connection"));
                     System.out.println(conn.getHeaderField("Content-Length"));
                 }
+
             } catch (Exception e) {
                 System.out.println("Error: " + e);
             }
@@ -282,32 +297,60 @@ public class Twitter {
             return clusterResults;
         }
 
-        /* replaceTweetsWithOriginals: Replaces all the cleaned tweets in the JSON cluster results with the original tweets */
+        /* removeUnsafeUnicodeCharacters: Removes characters that cause problems in Java Strings. */
+        String removeUnsafeUnicodeCharacters (String unSanitized) {
+            StringBuilder sanitized = new StringBuilder();
+
+            for (int i = 0; i < unSanitized.length(); i++) {
+                boolean useThisChar = true;
+                int unicodeVal = unSanitized.charAt(i);
+
+                if (unicodeVal == 13) /* if character is a carriage return, do not use */
+                    useThisChar = false;
+
+                if (useThisChar) /* if this character is usable, append it to the StringBuilder */
+                    sanitized.append(unSanitized.charAt(i));
+            }
+
+            return sanitized.toString();
+        }
+
+        /* replaceTweetsWithOriginals: Replaces all the cleaned tweets in the JSON cluster results with the original tweets. */
         String replaceTweetsWithOriginals (String jsonResults) {
+            System.out.println("Replacing cleaned tweets with originals.");
+
             for (String origTweet: originalTweets) { /* for every string in the set of original tweet strings, replace the clean text with the original tweet text */
                 String cleanedTweet = cleanTweet(origTweet); /* get its clean tweet for comparison */
 
                 String escapedOrigTweet = origTweet;
-                escapedOrigTweet = escapedOrigTweet.replace("\n", "\\n"); /* Escape new line characters. */
-                escapedOrigTweet = escapedOrigTweet.replace("\"", "\\\""); /* Replace quotation marks with a backslash + quotation mark. */
+                escapedOrigTweet = escapedOrigTweet.replace("\\", "\\\\"); /* escape backslashes */
+                escapedOrigTweet = escapedOrigTweet.replace("\n", "\\n"); /* escape new line characters */
+                escapedOrigTweet = escapedOrigTweet.replace("\"", "\\\""); /* escape quotation marks */
 
-                int tweetIndex = 0;
-                tweetIndex = jsonResults.indexOf(": " + cleanedTweet + "\""); /* find where this tweet should go in the json string */
-                if (tweetIndex > -1) /* if the text was found, increase index by two to exclude the ": " that was used to find the index */
-                    tweetIndex += 2;
-                else { /* else, try to find it again without the space after the colon */
-                    tweetIndex = jsonResults.indexOf(":" + cleanedTweet + "\""); /* find where this tweet should go in the json string */
-                    if (tweetIndex > -1) /* if the text was found, increase index by 1 to exclude the ":" that was used to find the index */
-                        tweetIndex++;
-                }
+                int tweetIndex = -1;
+                int foundCount = 0;
+                do {
+                    if (cleanedTweet.length() > 0) {
+                        tweetIndex = jsonResults.indexOf(": " + cleanedTweet + "\""); /* find where this tweet should go in the json string */
+                        if (tweetIndex > -1) /* if the text was found, increase index by two to exclude the ": " that was used to find the index */
+                            tweetIndex += 2;
+                        else { /* else, try to find it again without the space after the colon */
+                            tweetIndex = jsonResults.indexOf(":" + cleanedTweet + "\""); /* find where this tweet should go in the json string */
+                            if (tweetIndex > -1) /* if the text was found, increase index by 1 to exclude the ":" that was used to find the index */
+                                tweetIndex++;
+                        }
 
-                if (tweetIndex > -1) /* if the text was found, replace the cleaned text from the json string with the escaped original tweet */
-                    jsonResults = jsonResults.substring(0, tweetIndex) + escapedOrigTweet + jsonResults.substring(tweetIndex + cleanedTweet.length());
-                else
-                    System.out.println("Not found: \"" + cleanedTweet + "\". Orig: \"" + origTweet + "\"");
+                        if (tweetIndex > -1) { /* if the text was found, replace the cleaned text from the json string with the escaped original tweet */
+                            jsonResults = jsonResults.substring(0, tweetIndex) + escapedOrigTweet + jsonResults.substring(tweetIndex + cleanedTweet.length());
+                            foundCount++;
+                        } /* else if (foundCount == 0)
+                            System.out.println("Not found: \"" + cleanedTweet + "\". Orig: \"" + origTweet.replace("\n", " ") + "\""); */
+                    }
+                } while (tweetIndex > -1); /* repeat to replace any duplicates that may have been returned by the clustering API */
             }
 
             System.out.println(jsonResults);
+
             return jsonResults;
         }
 
@@ -316,11 +359,13 @@ public class Twitter {
             try {
                 JSONObject myJson = new JSONObject(input);
                 String xmlCon = XML.toString(myJson);
-                System.out.println(xmlCon);
+                //System.out.println(xmlCon);
 
+                System.out.println("Writing results in XML to file.");
                 try (Writer writer = new BufferedWriter(new OutputStreamWriter(
                         new FileOutputStream(given +".xml"), "utf-8"))) {
                     writer.write(xmlCon);
+                    System.out.println("Write finished.");
                 }catch(Exception e){
                     e.printStackTrace(System.out);
                 }
