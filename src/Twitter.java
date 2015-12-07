@@ -91,6 +91,9 @@ public class Twitter {
                 searchTerms[0] = args[0];
                 searchTerms[1] = args[2];
             }
+
+            for (int i = 0; i < searchTerms.length; i++)  /* for each search term, set all letters to lowercase, replace all carets with spaces, and trim whitespace from ends */
+                searchTerms[i] = searchTerms[i].toLowerCase().replace("^", " ").trim();
         }
 
         /* for each search term, create a new Streaming object and run it */
@@ -324,7 +327,8 @@ public class Twitter {
 
                 String escapedOrigTweet = origTweet;
                 escapedOrigTweet = escapedOrigTweet.replace("\\", "\\\\"); /* escape backslashes */
-                escapedOrigTweet = escapedOrigTweet.replace("\n", "\\n"); /* escape new line characters */
+                escapedOrigTweet = escapedOrigTweet.replace("\n", " "); /* replace new line characters with spaces */
+                //escapedOrigTweet = escapedOrigTweet.replace("\n", "\\n"); /* escape new line characters */
                 escapedOrigTweet = escapedOrigTweet.replace("\"", "\\\""); /* escape quotation marks */
 
                 int tweetIndex = -1;
