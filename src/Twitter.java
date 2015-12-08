@@ -1,6 +1,9 @@
 import twitter4j.*;
 import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.net.URL;
 import java.util.concurrent.ExecutionException;
@@ -142,17 +145,11 @@ public class Twitter {
                                 finished = true;
                                 twitterStream.clearListeners(); /* remove the listeners from our twitterStream object */
 
-                                /*for (String twt:originalTweets) { //testing purposes
-                                    twt = twt.replace("\n", " ");
-                                    String unicodeString = "";
-                                    for (int i = 0; i < twt.length(); i++) {
-                                        int unicodeVal = twt.charAt(i);
-                                        unicodeString += unicodeVal + " ";
-                                    }
-
-                                    System.out.println(twt + " --- " + cleanTweet(twt) + " --- " + unicodeString);
-                                }*/
-                                saveAsXML(replaceTweetsWithOriginals(getClusterResults(storeTweets, given))); /* get cluster results, replace clean tweets with originals, convert to XML and write to file */
+                                String clusterResults = getClusterResults(storeTweets, given); /* get cluster results for our collected tweets */
+                                if (clusterResults.equals("fail"))
+                                    System.out.println("There was an issue with retrieving cluster data, aborting.");
+                                else
+                                    saveAsXML(replaceTweetsWithOriginals(clusterResults)); /* replace clean tweets with originals, convert to XML and write to file */
 
                                 twitterStream.cleanUp(); /* shutdown internal stream consuming thread */
                             }
@@ -244,7 +241,7 @@ public class Twitter {
             return cleanedTweet;
         }
 
-        /* getClusterResults: Formats all strings in a LinkedHashSet into JSON, submits to clustering API, and returns the response from the clustering API. */
+        /* getClusterResults: Formats all strings in a LinkedHashSet into JSON, calls method to get cluster data and returns it.  */
         String getClusterResults (LinkedHashSet<String> tweetSet, String searchTerm) {
             StringBuilder jsonBuffer = new StringBuilder();
             jsonBuffer.append("{\"type\":\"pre-sentenced\",\"text\":[");
@@ -262,39 +259,85 @@ public class Twitter {
             try {
                 URL postURL = new URL("https://rxnlp-core.p.mashape.com/generateClusters");
                 HttpsURLConnection conn = (HttpsURLConnection) postURL.openConnection();
-
-                /* set request method and headers */
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("X-Mashape-Key", "3qhKsAzciTmsh2xJmNjMWclaHDuDp1vcvYBjsnpMkIIbebgLRx");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("Accept", "application/json");
-                conn.setDoOutput(true);
-
-                try (DataOutputStream writer = new DataOutputStream(conn.getOutputStream())) {
-                    writer.writeBytes(jsonBuffer.toString()); /* send POST request with our JSON-formatted string as the parameter */
-                    writer.flush();
-                }
-                catch (IOException e) {
-                    e.printStackTrace(System.out);
-                }
-                System.out.println("Tweets sent for analysis, waiting for response.");
-
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
-                    String line;
-                    System.out.println("Cluster results received for search term: " + searchTerm + ". Unique Sentences: " + tweetSet.size());
-
-                    while ((line = reader.readLine()) != null) {
-                        System.out.println(line);
-                        clusterResults += line;
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace(System.out);
-                    System.out.println(conn.getHeaderField("Connection"));
-                    System.out.println(conn.getHeaderField("Content-Length"));
-                }
-
+                clusterResults = getClusterResultsConnection(conn, jsonBuffer);
+                System.out.println("Cluster results received for search term: " + searchTerm + ". Unique Sentences: " + tweetSet.size());
             } catch (Exception e) {
-                System.out.println("Error: " + e);
+                System.out.println("There was a problem when trying with first URL, attempting with second URL.");
+                try {
+                    URL postURL = new URL("http://findilike.linkpc.net:9000/generateClusters");
+                    HttpURLConnection conn = (HttpURLConnection) postURL.openConnection();
+                    clusterResults = getClusterResultsConnection(conn, jsonBuffer);
+                    System.out.println("Cluster results received for search term: " + searchTerm + ". Unique Sentences: " + tweetSet.size());
+                } catch (Exception e2) {
+                    writeExceptionsToFile(e, e2);
+                    clusterResults = "fail";
+                }
+            }
+
+            return clusterResults;
+        }
+
+        /* getClusterResultsConnection: Connects and submits POST request to given HTTP connection, returns the response. */
+        String getClusterResultsConnection (HttpURLConnection conn, StringBuilder jsonBuffer) throws Exception {
+            /* set request method and headers */
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("X-Mashape-Key", "3qhKsAzciTmsh2xJmNjMWclaHDuDp1vcvYBjsnpMkIIbebgLRx");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setDoOutput(true);
+
+            try (DataOutputStream writer = new DataOutputStream(conn.getOutputStream())) {
+                writer.writeBytes(jsonBuffer.toString()); /* send POST request with our JSON-formatted string as the parameter */
+                writer.flush();
+            }
+            catch (IOException e) {
+                throw e;
+            }
+            System.out.println("Tweets sent for analysis, waiting for response.");
+
+            String clusterResults = "";
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+                    //System.out.println(line);
+                    clusterResults += line;
+                }
+            } catch (IOException e) {
+                throw e;
+            }
+
+            return clusterResults;
+        }
+
+        /* getClusterResultsConnection: Connects and submits POST request to given HTTPS connection, returns the response. */
+        String getClusterResultsConnection (HttpsURLConnection conn, StringBuilder jsonBuffer) throws Exception {
+            /* set request method and headers */
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("X-Mashape-Key", "3qhKsAzciTmsh2xJmNjMWclaHDuDp1vcvYBjsnpMkIIbebgLRx");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setDoOutput(true);
+
+            try (DataOutputStream writer = new DataOutputStream(conn.getOutputStream())) {
+                writer.writeBytes(jsonBuffer.toString()); /* send POST request with our JSON-formatted string as the parameter */
+                writer.flush();
+            }
+            catch (IOException e) {
+                throw e;
+            }
+            System.out.println("Tweets sent for analysis, waiting for response.");
+
+            String clusterResults = "";
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+                    //System.out.println(line);
+                    clusterResults += line;
+                }
+            } catch (IOException e) {
+                throw e;
             }
 
             return clusterResults;
@@ -353,7 +396,7 @@ public class Twitter {
                 } while (tweetIndex > -1); /* repeat to replace any duplicates that may have been returned by the clustering API */
             }
 
-            System.out.println(jsonResults);
+            //System.out.println(jsonResults);
 
             return jsonResults;
         }
@@ -371,16 +414,51 @@ public class Twitter {
                     writer.write(xmlCon);
                     System.out.println("Write finished.");
                 }catch(Exception e){
-                    e.printStackTrace(System.out);
+                    writeExceptionToFile(e);
                 }
             }catch(Exception e){
-                e.printStackTrace(System.out);
+                writeExceptionToFile(e);
             }
         }
 
         /* needed to check if stream is below threshold */
         boolean stream_watcher( int max_tweets ) {
             return ++total_tweets > max_tweets; /* return true if we have reached max tweets amount */
+        }
+
+        /* writeExceptionToFile: Prints an exception to System.out and writes it to a file. */
+        void writeExceptionToFile(Exception excep) {
+            excep.printStackTrace(System.out);
+
+            DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            Date date = new Date();
+            String fileName = "exception_" + dateFormat.format(date).trim().replace(" ", "_").replace(":", "-") + ".txt";
+
+            try (Writer writer = new BufferedWriter(new OutputStreamWriter(
+                    new FileOutputStream(fileName), "utf-8"))) {
+                writer.write(excep.toString());
+                System.out.println("Exception written to file.");
+            } catch(Exception e){
+                System.out.println("Failed to write exception to file.");
+            }
+        }
+
+        /* writeExceptionsToFile: Prints two exceptions to System.out and writes them to a file. */
+        void writeExceptionsToFile(Exception excep, Exception excep2) {
+            excep.printStackTrace(System.out);
+            excep2.printStackTrace(System.out);
+
+            DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            Date date = new Date();
+            String fileName = "exception_" + dateFormat.format(date).trim().replace(" ", "_").replace(":", "-") + ".txt";
+
+            try (Writer writer = new BufferedWriter(new OutputStreamWriter(
+                    new FileOutputStream(fileName), "utf-8"))) {
+                writer.write(excep.toString() + "\n" + excep2.toString());
+                System.out.println("Exceptions written to file.");
+            } catch(Exception e){
+                System.out.println("Failed to write exceptions to file.");
+            }
         }
     }
 }
