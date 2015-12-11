@@ -14,9 +14,9 @@ import org.json.JSONObject;
 public class Twitter {
     public static void main(String[] args) {
         /* local vars */
-        String[] searchTerms;
-        int[] numberOfTweets;
-        int numberOfSearchTerms, searchTerm = 1, maxTweets = 10000, minNumOfTweets = 10; /* change minNumOfTweets HERE!!! */
+        String[] searchTerms = new String[0];
+        int[] numberOfTweets = new int[0];
+        int numberOfSearchTerms = 0, searchTerm = 1, maxTweets = 10000, minNumOfTweets = 10; /* change minNumOfTweets HERE!!! */
 
         /* terminal -- no GUI */
         if(args.length == 0){
@@ -78,21 +78,30 @@ public class Twitter {
         /* GUI -- args provided */
         else {
             /* args [String 1] [tweet count 1] [String 2] [Tweet count 2] */
-            if(args.length == 2){
+            try {
+                if (args.length == 2) {
                 /* One search */
-                numberOfSearchTerms = 1;
-                numberOfTweets = new int[1];
-                numberOfTweets[0] = Integer.parseInt(args[1]);
-                searchTerms = new String[1];
-                searchTerms[0] = args[0];
-            } else {
-                numberOfSearchTerms = 2;
-                numberOfTweets = new int[2];
-                numberOfTweets[0] = Integer.parseInt(args[1]);
-                numberOfTweets[1] = Integer.parseInt(args[3]);
-                searchTerms = new String[2];
-                searchTerms[0] = args[0];
-                searchTerms[1] = args[2];
+                    numberOfSearchTerms = 1;
+                    numberOfTweets = new int[1];
+                    numberOfTweets[0] = Integer.parseInt(args[1]);
+                    searchTerms = new String[1];
+                    searchTerms[0] = args[0];
+                } else {
+                    numberOfSearchTerms = 2;
+                    numberOfTweets = new int[2];
+                    numberOfTweets[0] = Integer.parseInt(args[1]);
+                    numberOfTweets[1] = Integer.parseInt(args[3]);
+                    searchTerms = new String[2];
+                    searchTerms[0] = args[0];
+                    searchTerms[1] = args[2];
+                }
+            } catch (NumberFormatException e) {
+                printBadArgumentMessageAndExit();
+            }
+
+            for (int i = 0; i < numberOfSearchTerms; i++) { /* if the tweet numbers aren't in the correct range... */
+                if (numberOfTweets[i] < 10 || numberOfTweets[i] > 10000)
+                    printBadArgumentMessageAndExit();
             }
 
             for (int i = 0; i < searchTerms.length; i++)  /* for each search term, set all letters to lowercase, replace all carets with spaces, and trim whitespace from ends */
@@ -107,13 +116,19 @@ public class Twitter {
         }
     }
 
+    static void printBadArgumentMessageAndExit() {
+        System.out.println("Your arguments are invalid. Please use the following format:");
+        System.out.println("java -jar 3250_Final.jar (term1) (integer) (term2) (integer)");
+        System.exit(1);
+    }
+
     /* handles all connections to the Twitter Streaming API */
     static class Streaming {
         /* local vars */
-        LinkedHashSet<String> storeTweets = new LinkedHashSet<>();
-        LinkedHashSet<String> originalTweets = new LinkedHashSet<>();
+        LinkedHashSet<String> storeTweets = new LinkedHashSet<>(); /* storage of clean tweets */
+        LinkedHashSet<String> originalTweets = new LinkedHashSet<>(); /* storage of original tweets */
         int number_of_tweets, total_tweets = 0;
-        String given;
+        String given; /* search term */
 
         /* constructor */
         Streaming(String term, int numTweets) {
@@ -216,7 +231,7 @@ public class Twitter {
             String[] words = rawTweet.split("\\s+"); /* split the tweet into an array of strings */
             String cleanedTweet = "";
 
-            for (int i = 0; i < words.length; i++) {
+            for (int i = 0; i < words.length; i++) { /* for every word in the String */
                 boolean includeThisWord = true;
                 if (words[i].equals("rt")) /* don't include word that specifies re-tweets */
                     includeThisWord = false;
@@ -256,12 +271,12 @@ public class Twitter {
             jsonBuffer.append("]}");
 
             String clusterResults = "";
-            try {
+            try { /* try to use the clustering API with the first URL */
                 URL postURL = new URL("https://rxnlp-core.p.mashape.com/generateClusters");
                 HttpsURLConnection conn = (HttpsURLConnection) postURL.openConnection();
                 clusterResults = getClusterResultsConnection(conn, jsonBuffer);
                 System.out.println("Cluster results received for search term: " + searchTerm + ". Unique Sentences: " + tweetSet.size());
-            } catch (Exception e) {
+            } catch (Exception e) { /* if there was a problem, try to use the clustering API with the 2nd URL */
                 System.out.println("There was a problem when trying with first URL, attempting with second URL.");
                 try {
                     URL postURL = new URL("http://findilike.linkpc.net:9000/generateClusters");
@@ -300,7 +315,6 @@ public class Twitter {
                 String line;
 
                 while ((line = reader.readLine()) != null) {
-                    //System.out.println(line);
                     clusterResults += line;
                 }
             } catch (IOException e) {
@@ -333,7 +347,6 @@ public class Twitter {
                 String line;
 
                 while ((line = reader.readLine()) != null) {
-                    //System.out.println(line);
                     clusterResults += line;
                 }
             } catch (IOException e) {
@@ -375,7 +388,6 @@ public class Twitter {
                 escapedOrigTweet = escapedOrigTweet.replace("\"", "\\\""); /* escape quotation marks */
 
                 int tweetIndex = -1;
-                int foundCount = 0;
                 do {
                     if (cleanedTweet.length() > 0) {
                         tweetIndex = jsonResults.indexOf(": " + cleanedTweet + "\""); /* find where this tweet should go in the json string */
@@ -389,14 +401,10 @@ public class Twitter {
 
                         if (tweetIndex > -1) { /* if the text was found, replace the cleaned text from the json string with the escaped original tweet */
                             jsonResults = jsonResults.substring(0, tweetIndex) + escapedOrigTweet + jsonResults.substring(tweetIndex + cleanedTweet.length());
-                            foundCount++;
-                        } /* else if (foundCount == 0)
-                            System.out.println("Not found: \"" + cleanedTweet + "\". Orig: \"" + origTweet.replace("\n", " ") + "\""); */
+                        }
                     }
                 } while (tweetIndex > -1); /* repeat to replace any duplicates that may have been returned by the clustering API */
             }
-
-            //System.out.println(jsonResults);
 
             return jsonResults;
         }
@@ -406,7 +414,6 @@ public class Twitter {
             try {
                 JSONObject myJson = new JSONObject(input);
                 String xmlCon = XML.toString(myJson);
-                //System.out.println(xmlCon);
 
                 System.out.println("Writing results in XML to file.");
                 try (Writer writer = new BufferedWriter(new OutputStreamWriter(
@@ -436,7 +443,7 @@ public class Twitter {
 
             try (Writer writer = new BufferedWriter(new OutputStreamWriter(
                     new FileOutputStream(fileName), "utf-8"))) {
-                writer.write(excep.toString());
+                writer.write("Exception: " + excep.toString());
                 System.out.println("Exception written to file.");
             } catch(Exception e){
                 System.out.println("Failed to write exception to file.");
@@ -454,7 +461,8 @@ public class Twitter {
 
             try (Writer writer = new BufferedWriter(new OutputStreamWriter(
                     new FileOutputStream(fileName), "utf-8"))) {
-                writer.write(excep.toString() + "\n" + excep2.toString());
+                writer.write("Exception 1: " + excep.toString() + "\n");
+                writer.write("Exception 2: " + excep2.toString());
                 System.out.println("Exceptions written to file.");
             } catch(Exception e){
                 System.out.println("Failed to write exceptions to file.");
